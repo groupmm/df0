@@ -1,0 +1,23 @@
+exclude: ^thirdPartyLegalNotices/attributions\.txt$
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.6.0
+  hooks:
+  - id: check-yaml
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+  - id: debug-statements
+
+- repo: https://github.com/pycqa/flake8
+  rev: 6.1.0
+  hooks:
+  - id: flake8
+    args: ["--ignore=E203,E501,F401,W503,E731", "--max-line-length=88"]
+
+- repo: https://github.com/psf/black
+  rev: 24.8.0
+  hooks:
+  - id: black
+    args: [--line-length, "99"]
+    language_version: python3

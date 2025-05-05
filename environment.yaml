@@ -1,0 +1,23 @@
+name: difff0
+
+channels:
+  - pytorch
+  - defaults
+  - conda-forge
+  - nvidia
+
+dependencies:
+  - python >=3.12.0, <4.0.0
+  - pip >=25.0, <26.0
+  - numpy >=2.2.0, <3.0.0
+  - matplotlib >=3.10.0, <4.0.0
+  - ipython >=9.1.0, <10.0.0
+  - ipykernel >=6.29.0, <7.0.0
+  - pandas >=2.2.0, <3.0.0
+  - tqdm >=4.67.0, <5.0.0
+  - pytorch::pytorch >=2.5.0, <3.0.0
+  - pytorch::torchvision >=0.20.0, <1.0.0
+  - pytorch::torchaudio >=2.5.0, <3.0.0
+  - pytorch::pytorch-cuda >=12.1, <12.2
+  - pip:
+    - librosa >=0.11.0, <1.0.0
