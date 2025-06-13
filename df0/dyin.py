@@ -130,7 +130,7 @@ class dYIN(torch.nn.Module):
 
         a = 0.5 * cmndf_padded[..., :-2] - cmndf + 0.5 * cmndf_padded[..., 2:]
         b = -0.5 * cmndf_padded[..., :-2] + 0.5 * cmndf_padded[..., 2:]
-        c = cmndf_padded
+        c = cmndf
 
         logits = (
             a[..., self.time_positions_rounded] * self.time_positions_difference**2
