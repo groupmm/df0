@@ -1,15 +1,21 @@
 # df0: Differentiable Variants of Classical Fundamental Frequency Estimators
 
+[![PyPI version](https://img.shields.io/pypi/v/df0.svg)](https://pypi.org/project/df0/)
+[![Python](https://img.shields.io/pypi/pyversions/df0.svg)](https://pypi.org/project/df0/)
+[![tests](https://github.com/groupmm/df0/actions/workflows/tests.yml/badge.svg)](https://github.com/groupmm/df0/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 This is a Python package containing Pytorch implementations of differentiable variants of classical fundamental frequency estimators (dYIN and dSWIPE). This code accompanies the following paper:
 
 ```bibtex
-@article{StrahlM25_dYIN_dSWIPE,
-  author    = {Sebastian Strahl and Meinard M{\"u}ller},
-  title     = {{dYIN} and {dSWIPE}: {D}ifferentiable Variants of Classical Fundamental Frequency Estimators},
-  journal   = {},
-  volume    = {},
-  pages     = {},
-  year      = {},
+@article{StrahlM25_df0_TASLPRO,
+  author  = {Sebastian Strahl and Meinard M{\"u}ller},
+  title   = {{dYIN} and {dSWIPE}: {D}ifferentiable Variants of Classical Fundamental Frequency Estimators},
+  journal = {{IEEE/ACM} Transactions on Audio, Speech, and Language Processing},
+  volume  = {33},
+  pages   = {2622--2633},
+  year    = {2025},
+  doi     = {10.1109/TASLPRO.2025.3581119}
 }
 ```
 
@@ -19,23 +25,30 @@ For details and references, please check out this paper.
 ## Installation
 
 ### 1. Set up Python environment
-We recommend setting up a Python environment including Pytorch before installing `df0`. You may use the example environment provided as part of this package:
+We recommend setting up a Python environment including Pytorch before installing `df0`. You may use the [example environment](environment.yaml) provided as part of this package:
 
 ```bash
 git clone https://github.com/groupmm/df0.git
 cd df0
 conda env create -f environment.yaml
+conda activate df0
 ```
 
 ### 2. Install `df0`
 
-#### Option 1: Installation without cloning this repository:
+#### Option 1: Install from PyPI
 
 ```bash
-pip install "git+https://github.com/groupmm/df0.git#egg=df0"
+pip install df0
 ```
 
-#### Option 2: Installation by cloning this repository:
+To also install the dependencies required to run the demo notebook:
+
+```bash
+pip install "df0[demo]"
+```
+
+#### Option 2: Install by cloning this repository (for development)
 
 ```bash
 git clone https://github.com/groupmm/df0.git
@@ -43,25 +56,27 @@ cd df0
 pip install -e .
 ```
 
-#### Option 3: Install all packages to run the demo notebook:
-
-```bash
-pip install "git+https://github.com/groupmm/df0.git#egg=df0[demo]"
-```
-
-or
-
-```bash
-git clone https://github.com/groupmm/df0.git
-cd df0
-pip install -e .[demo]
-```
-
 ## Usage
 
 ### Python
 
-The usage of dYIN and dSWIPE as a differentiable Pytorch module is demonstrated in [demo.ipynb](demo.ipynb).
+```python
+import torch
+import librosa
+from df0.dyin import dYIN
+from df0.dswipe import dSWIPE
+
+x, fs = librosa.load("audio.wav", sr=16000)
+x = torch.from_numpy(x)
+
+dyin = dYIN(fs=fs, hop_size=160)
+f0_hz = dyin(x)["f0_hz"]  # shape: (n_frames,)
+
+dswipe = dSWIPE(fs=fs, hop_size=160)
+f0_hz = dswipe(x)["f0_hz"]  # shape: (n_frames,)
+```
+
+For more details, see [demo.ipynb](demo.ipynb).
 
 
 ### Command-line interface
@@ -99,6 +114,14 @@ time,frequency
 ...
 ```
 
+## Tests
+
+We provide automated tests for each algorithm. To run them:
+
+```bash
+pip install "df0[test]"
+pytest
+```
 
 ## Contribution
 Automated code style checks via [pre-commit](https://pre-commit.com/):
@@ -106,15 +129,14 @@ Automated code style checks via [pre-commit](https://pre-commit.com/):
 ```bash
 pip install pre-commit
 pre-commit install
+pre-commit run --all-files
 ```
 
 
 ## License
 The code for this toolbox is published under an [MIT license](LICENSE).
-This does not apply to the data files, which are taken from the [FMP notebooks](https://www.audiolabs-erlangen.de/resources/MIR/FMP/C0/C0.html).
 
 
 ## Acknowledgements
 
-This work was funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under Grant No. 500643750 (MU 2686/15-1). The authors are with the [International Audio Laboratories Erlangen](https://audiolabs-erlangen.de/), a joint institution of the [Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)](https://www.fau.eu/) and [Fraunhofer Institute for
-Integrated Circuits IIS](https://www.iis.fraunhofer.de/en.html).
+This work was funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under Grant No. 500643750 (MU 2686/15-1). The authors are with the [International Audio Laboratories Erlangen](https://audiolabs-erlangen.de/), a joint institution of the [Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)](https://www.fau.eu/) and [Fraunhofer Institute for Integrated Circuits IIS](https://www.iis.fraunhofer.de/en.html).

@@ -4,7 +4,13 @@ from .f0_utils import cents_to_hz
 
 
 class F0Selector(torch.nn.Module):
-    def __init__(self, selection_strategy, f_min, f0_classes_cent, weighted_average_delta=None):
+    def __init__(
+        self,
+        selection_strategy: str,
+        f_min: float,
+        f0_classes_cent: torch.Tensor,
+        weighted_average_delta: int | None = None,
+    ):
         super().__init__()
 
         assert selection_strategy in [

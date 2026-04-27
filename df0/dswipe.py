@@ -3,60 +3,59 @@ import torch.nn.functional as F
 
 from .dswipe_utils import interp1d_linear, interp1d_linear_get_matrix, prime_and_one
 from .f0_selection import F0Selector
-from .f0_utils import get_log_frequencies, hz_to_cents
+from .f0_utils import erb_to_hz, get_log_frequencies, hz_to_cents, hz_to_erb
 
 
 class dSWIPE(torch.nn.Module):
     """
-    This module implements a differentiable version of the SWIPE algorithm for F0 estimation, dubbed dSWIPE.
+    Differentiable SWIPE (dSWIPE) module for F0 estimation.
 
     Implementation inspired by:
     https://github.com/groupmm/libf0/blob/main/libf0/swipe.py
     https://github.com/groupmm/libf0/blob/main/libf0/swipe_slim.py
 
     Parameters:
-        fs (int): Sampling frequency in Hz
-        hop_size (int): Hop size in samples
-        erb_f_min (float): Lowest frequency of the intermediate ERB-based frequency axis in Hz
-        erb_f_max (float): Highest frequency of the intermediate ERB-based frequency axis in Hz
-        erb_r: Resolution of the intermediate ERB-based frequency axis in ERB units
-        f0_min (float): Lowest detectable F0 in Hz
-        f0_max (float): Highest detectable F0 in Hz
-        f0_r_cent (float): Output resolution in cents
-        template_params (dict): Parameter dictionary for the template comparison module
-        f0_selection_strategy (str): Specifies the F0 selection strategy.
-            Options: [None, "argmax", "parabolic_interpolation", or "local_weighted_average"]
+        fs (int): Sampling frequency in Hz.
+        hop_size (int): Hop size in samples.
+        erb_f_min (float): Minimum frequency of the ERB-based frequency axis in Hz.
+        erb_f_max (float): Maximum frequency of the ERB-based frequency axis in Hz.
+        erb_r (float): Resolution of the ERB-based frequency axis in ERB units.
+        f0_min (float): Lowest detectable F0 in Hz.
+        f0_max (float): Highest detectable F0 in Hz.
+        f0_r_cent (float): Output frequency resolution in cents.
+        template_params (dict | None): Parameter dictionary for the TemplateComparison module.
+        f0_selection_strategy (str | None): F0 selection strategy.
+            Options: None, "argmax", "parabolic_interpolation", "local_weighted_average".
     """
 
     def __init__(
         self,
-        fs=16000,
-        hop_size=320,
-        erb_f_min=13.75,
-        erb_f_max=8000,
-        erb_r=0.1,
-        f0_min=55.0,
-        f0_max=3520.0,
-        f0_r_cent=10,
-        template_params={},
-        f0_selection_strategy=None,
+        fs: int = 16000,
+        hop_size: int = 320,
+        erb_f_min: float = 13.75,
+        erb_f_max: float = 8000.0,
+        erb_r: float = 0.1,
+        f0_min: float = 55.0,
+        f0_max: float = 3520.0,
+        f0_r_cent: float = 10.0,
+        template_params: dict | None = None,
+        f0_selection_strategy: str | None = "argmax",
     ):
 
         super().__init__()
+
+        assert isinstance(fs, int), "'fs' must be an integer."
+        assert isinstance(hop_size, int), "'hop_size' must be an integer."
+
+        if template_params is None:
+            template_params = {}
 
         self.fs = fs
         self.hop_size = hop_size
 
         # define set of ERB-based frequencies to which the spectrograms are resampled
-        hz2erb = lambda hz: 21.4 * torch.log10(1 + torch.tensor(hz) / 229)
-        erb2hz = lambda erbs: (10 ** (erbs / 21.4) - 1) * 229
-
-        f_erb = torch.arange(
-            hz2erb(erb_f_min),
-            hz2erb(erb_f_max),
-            erb_r,
-        )
-        self.f_erb_hz = erb2hz(f_erb)
+        f_erb = torch.arange(hz_to_erb(erb_f_min), hz_to_erb(erb_f_max), erb_r)
+        self.f_erb_hz = erb_to_hz(f_erb)
 
         # define set of F0 classes
         f0_classes_hz = get_log_frequencies(f_min=f0_min, f_max=f0_max, cent_step=f0_r_cent)
@@ -163,7 +162,14 @@ class dSWIPE(torch.nn.Module):
 
         return torch.stack(x_erb_all, dim=-1)  # (bs, n_erbs, n_frames, n_windows)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
+        """
+        Args:
+            x (torch.Tensor): Input waveform of shape (signal_length,) or (batch, signal_length).
+
+        Returns:
+            dict with keys 'logits', 'probs', and optionally 'f0_hz'.
+        """
         if x.ndim == 1:
             x = x.unsqueeze(dim=0)
             remove_batch_dim = True
@@ -236,18 +242,29 @@ class TemplateComparison(torch.nn.Module):
 
     def __init__(
         self,
-        f_erb_hz,
-        f0_classes_hz,
-        decay_factor=0.5,
-        normalization_type="l2",
-        training_mode=None,
-        template_init="swipe",
-        learned_lobe_n=50,
-        prototype_n_oct_above=4,
-        prototype_n_oct_below=3,
-        prototype_bins_per_oct=60,
+        f_erb_hz: torch.Tensor,
+        f0_classes_hz: torch.Tensor,
+        decay_factor: float = 0.5,
+        normalization_type: str = "l2",
+        training_mode: str | None = None,
+        template_init: str = "swipe",
+        learned_lobe_n: int = 50,
+        prototype_n_oct_above: int = 4,
+        prototype_n_oct_below: int = 3,
+        prototype_bins_per_oct: int = 60,
     ):
         super().__init__()
+
+        assert isinstance(learned_lobe_n, int), "'learned_lobe_n' must be an integer."
+        assert isinstance(
+            prototype_n_oct_above, int
+        ), "'prototype_n_oct_above' must be an integer."
+        assert isinstance(
+            prototype_n_oct_below, int
+        ), "'prototype_n_oct_below' must be an integer."
+        assert isinstance(
+            prototype_bins_per_oct, int
+        ), "'prototype_bins_per_oct' must be an integer."
 
         self.register_buffer("f_erb_hz", f_erb_hz)
         self.register_buffer("f0_classes_hz", f0_classes_hz)
@@ -535,7 +552,14 @@ class TemplateComparison(torch.nn.Module):
         # overwrite templates in buffer
         self.register_buffer("templates", templates_normalized)
 
-    def forward(self, x_erb):
+    def forward(self, x_erb: torch.Tensor):
+        """
+        Args:
+            x_erb (torch.Tensor): ERB-based features of shape (batch, n_erbs, n_frames, n_windows).
+
+        Returns:
+            torch.Tensor: Template correlation scores of shape (batch, n_f0_classes, n_frames, n_windows).
+        """
         self.update_templates()
         S = torch.einsum(
             "abcd,eb->aecd", x_erb, self.templates

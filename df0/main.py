@@ -53,11 +53,13 @@ def get_parser():
         default="f0_csv",
         help="Directory to save the output predictions",
     )
-    parser.add_argument("--fs", type=float, default=16000.0, help="Sampling frequency in Hz")
+    parser.add_argument("--fs", type=int, default=16000, help="Sampling frequency in Hz")
     parser.add_argument("--hop_size", type=int, default=320, help="Hop size in samples")
     parser.add_argument("--f0_min", type=float, default=55.0, help="Lowest detectable F0 in Hz")
     parser.add_argument("--f0_max", type=float, default=3520.0, help="Highest detectable F0 in Hz")
-    parser.add_argument("--f0_r_cent", type=float, default=10.0, help="Output resolution in cents")
+    parser.add_argument(
+        "--f0_r_cent", type=float, default=10.0, help="Output frequency resolution in cents"
+    )
     parser.add_argument(
         "--f0_selection_strategy",
         type=str,
@@ -74,19 +76,19 @@ def dswipe():
         "--erb_f_min",
         type=float,
         default=13.75,
-        help="Lowest frequency of the intermediate ERB-based frequency axis in Hz",
+        help="Minimum frequency of the ERB-based frequency axis in Hz",
     )
     parser.add_argument(
         "--erb_f_max",
         type=float,
-        default=8000,
-        help="Highest frequency of the intermediate ERB-based frequency axis in Hz",
+        default=8000.0,
+        help="Maximum frequency of the ERB-based frequency axis in Hz",
     )
     parser.add_argument(
         "--erb_r",
         type=float,
         default=0.1,
-        help="Resolution of the intermediate ERB-based frequency axis in ERB units",
+        help="Resolution of the ERB-based frequency axis in ERB units",
     )
     args = parser.parse_args()
 
@@ -108,7 +110,7 @@ def dswipe():
 
 def dyin():
     parser = get_parser()
-    parser.add_argument("--frame_size", type=int, default=512, help="Frame size in samples")
+    parser.add_argument("--frame_size", type=int, default=1600, help="Frame size in samples")
     args = parser.parse_args()
 
     dyin_config = {

@@ -8,30 +8,34 @@ from .f0_selection import F0Selector
 
 class dYIN(torch.nn.Module):
     """
-    This module implements a differentiable version of the YIN algorithm for F0 estimation, dubbed dYIN.
+    Differentiable YIN (dYIN) module for F0 estimation.
 
     Parameters:
-        fs (int): Sampling frequency in Hz
-        frame_size (int): Frame size in samples
-        hop_size (int): Hop size in samples
-        f0_min (float): Lowest detectable F0 in Hz
-        f0_max (float): Highest detectable F0 in Hz
-        f0_r_cent (float): Output resolution in cents
-        f0_selection_strategy (str): Specifies the F0 selection strategy.
-            Options: [None, "argmax", "parabolic_interpolation", or "local_weighted_average"]
+        fs (int): Sampling frequency in Hz.
+        frame_size (int): Frame size in samples.
+        hop_size (int): Hop size in samples.
+        f0_min (float): Lowest detectable F0 in Hz.
+        f0_max (float): Highest detectable F0 in Hz.
+        f0_r_cent (float): Output frequency resolution in cents.
+        f0_selection_strategy (str | None): F0 selection strategy.
+            Options: None, "argmax", "parabolic_interpolation", "local_weighted_average".
     """
 
     def __init__(
         self,
-        fs=16000,
-        frame_size=512,
-        hop_size=320,
-        f0_min=55.0,
-        f0_max=3520.0,
-        f0_r_cent=10.0,
-        f0_selection_strategy=None,
+        fs: int = 16000,
+        frame_size: int = 1600,
+        hop_size: int = 320,
+        f0_min: float = 55.0,
+        f0_max: float = 3520.0,
+        f0_r_cent: float = 10.0,
+        f0_selection_strategy: str | None = "argmax",
     ):
         super().__init__()
+
+        assert isinstance(fs, int), "'fs' must be an integer."
+        assert isinstance(frame_size, int), "'frame_size' must be an integer."
+        assert isinstance(hop_size, int), "'hop_size' must be an integer."
 
         self.fs = fs
         self.f0_min = f0_min
@@ -41,13 +45,9 @@ class dYIN(torch.nn.Module):
         self.hop_size = hop_size
 
         self.tau_max = math.floor(fs / f0_min) + 1
-        assert self.tau_max < self.frame_size, "Frame size too small for chosen 'f0_min'!"
+        assert 2 * self.tau_max < self.frame_size, "Frame size too small for chosen 'f0_min'!"
 
         # calculate log-frequency axis and corresponding time lags
-        f0_classes_cent = get_log_frequencies(
-            f_min=f0_min, f_max=f0_max, cent_step=f0_r_cent, return_as="cent"
-        )
-
         self.f0_classes_hz = get_log_frequencies(
             f_min=f0_min, f_max=f0_max, cent_step=f0_r_cent, return_as="hz"
         )
@@ -63,6 +63,10 @@ class dYIN(torch.nn.Module):
         )
 
         if f0_selection_strategy is not None:
+            f0_classes_cent = get_log_frequencies(
+                f_min=f0_min, f_max=f0_max, cent_step=f0_r_cent, return_as="cent"
+            )
+
             self.f0_selector = F0Selector(
                 selection_strategy=f0_selection_strategy,
                 f_min=f0_min,
@@ -72,38 +76,37 @@ class dYIN(torch.nn.Module):
         else:
             self.f0_selector = None
 
-    def compute_batched_autocorrelation(self, signal, dim=-1):
-        """
-        Method for computing the autocorrelation function for a batch of signals.
-        """
-        # convolution via FFT
-        fft_size = 2 ** (
-            math.ceil(
-                torch.log(torch.as_tensor(2 * signal.shape[dim] - 1))
-                / torch.log(torch.as_tensor(2))
-            )
-            # int(torch.log(torch.tensor(signal.shape[dim])) // torch.log(torch.tensor([2]))) + 1
-        )
-        fft = torch.fft.rfft(signal, fft_size, dim=dim)
-        auto_corr = torch.fft.irfft(fft * fft.conj(), dim=dim)
-
-        return auto_corr
-
     def compute_cmndf(self, signal):
-        """
-        Method for computing the cumulative mean normalized difference function (CMNDF).
-        """
-        corr = self.compute_batched_autocorrelation(signal)[..., : self.tau_max + 1]
+        """Computes the cumulative mean normalized difference function (CMNDF) using a centered, symmetric variant."""
+        start = self.tau_max
+        end = self.frame_size - self.tau_max
+
+        # autocorrelation
+        fft_size = 2 ** math.ceil(
+            torch.log(torch.as_tensor(2 * signal.shape[-1] - 1)) / torch.log(torch.as_tensor(2))
+        )
+        b_input = F.pad(signal[..., start:end], (start, self.tau_max))
+        a = torch.fft.rfft(signal, fft_size, dim=-1)
+        b = torch.fft.rfft(b_input, fft_size, dim=-1)
+        raw = torch.fft.irfft(a * b.conj(), fft_size, dim=-1)
+        r_plus = raw[..., : self.tau_max + 1]
+        r_minus = torch.cat([raw[..., :1], raw[..., -self.tau_max :].flip(-1)], dim=-1)
+
+        # energy terms
+        sqrcs = F.pad(torch.cumsum(signal**2, dim=-1), [1, 0])
+        e_center = sqrcs[..., [end]] - sqrcs[..., [start]]
+        e_plus = (
+            sqrcs[..., end : end + self.tau_max + 1] - sqrcs[..., start : start + self.tau_max + 1]
+        )
+        e_minus = sqrcs[..., end - self.tau_max : end + 1].flip(-1) - sqrcs[..., : start + 1].flip(
+            -1
+        )
 
         # difference function
-        energy_acc = torch.cumsum(signal**2, axis=-1)
-        energy_loc = energy_acc[..., -(self.tau_max + 1) :] - energy_acc[..., : (self.tau_max + 1)]
-        diff = (
-            energy_loc[..., [0]] + energy_loc[..., : self.tau_max + 1]
-        ) - 2 * corr  # first value corresponds to tau=0
+        # diff = e_center + e_plus - 2 * r_plus                        # closer to original formulation but asymmetric
+        diff = e_center + 0.5 * (e_plus + e_minus) - r_plus - r_minus  # symmetric variant
 
-        # ensure non-negativity
-        diff = diff - diff.min(dim=-1, keepdim=True).values
+        diff = diff.clamp(min=0)  # numerical issues can yield small negative values
 
         # tau > 0
         cmndf = (
@@ -115,16 +118,12 @@ class dYIN(torch.nn.Module):
         )
 
         # tau = 0
-        cmndf = torch.cat([torch.ones(*cmndf.shape[:-1], 1), cmndf], dim=-1)
+        cmndf = torch.cat([torch.ones(*cmndf.shape[:-1], 1, device=cmndf.device), cmndf], dim=-1)
 
         return cmndf  # first value corresponds to tau=0
 
     def cmndf_to_logits_and_probs(self, cmndf):
-        """
-        Method for converting the cumulative mean normalized difference function (CMNDF)
-        into a probability mass function defined over a log-frequency axis.
-        Applies parabolic interpolation for resampling.
-        """
+        """Converts CMNDF to logits and probabilities over a log-frequency axis using parabolic interpolation."""
         # parabolic interpolation
         cmndf_padded = torch.cat([cmndf[..., [0]], cmndf, cmndf[..., [-1]]], dim=-1)
 
@@ -144,7 +143,14 @@ class dYIN(torch.nn.Module):
 
         return logits, probs
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
+        """
+        Args:
+            x (torch.Tensor): Input waveform of shape (..., signal_length).
+
+        Returns:
+            dict with keys 'logits', 'probs', and optionally 'f0_hz'.
+        """
         # padding for centered estimates
         x_pad = F.pad(x, (self.frame_size // 2, self.frame_size // 2 - 1))
 

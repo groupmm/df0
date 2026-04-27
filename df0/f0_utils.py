@@ -1,6 +1,16 @@
 import torch
 
 
+def hz_to_erb(hz):
+    """Converts frequencies in Hz to ERB units."""
+    return 21.4 * torch.log10(1 + torch.tensor(hz) / 229)
+
+
+def erb_to_hz(erbs):
+    """Converts ERB units to frequencies in Hz."""
+    return (10 ** (erbs / 21.4) - 1) * 229
+
+
 def midi_to_hz(f_midi):
     """Converts MIDI pitches to frequencies in Hz
 

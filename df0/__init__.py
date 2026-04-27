@@ -4,4 +4,6 @@ from . import dyin
 from . import f0_selection
 from . import f0_utils
 
-__version__ = "0.1.1"
+from importlib.metadata import version
+
+__version__ = version("df0")
