@@ -6,4 +6,4 @@ from . import f0_utils
 
 from importlib.metadata import version
 
-__version__ = version("df0")
+__version__ = version("df0-pitch")
