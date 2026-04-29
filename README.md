@@ -1,7 +1,6 @@
 # df0: Differentiable Variants of Classical Fundamental Frequency Estimators
 
-[![PyPI version](https://img.shields.io/pypi/v/df0.svg)](https://pypi.org/project/df0/)
-[![Python](https://img.shields.io/pypi/pyversions/df0.svg)](https://pypi.org/project/df0/)
+[![PyPI version](https://img.shields.io/pypi/v/df0-pitch.svg)](https://pypi.org/project/df0-pitch/)
 [![tests](https://github.com/groupmm/df0/actions/workflows/tests.yml/badge.svg)](https://github.com/groupmm/df0/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -39,13 +38,13 @@ conda activate df0
 #### Option 1: Install from PyPI
 
 ```bash
-pip install df0
+pip install df0-pitch
 ```
 
 To also install the dependencies required to run the demo notebook:
 
 ```bash
-pip install "df0[demo]"
+pip install "df0-pitch[demo]"
 ```
 
 #### Option 2: Install by cloning this repository (for development)
