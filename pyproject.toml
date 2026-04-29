@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "df0"
+name = "df0-pitch"
 version = "1.0.0"
 description = "Python package with Pytorch implementations of differentiable variants of classical fundamental frequency estimators (dYIN and dSWIPE)"
 readme = "README.md"

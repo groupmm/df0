@@ -118,7 +118,7 @@ time,frequency
 We provide automated tests for each algorithm. To run them:
 
 ```bash
-pip install "df0[test]"
+pip install "df0-pitch[test]"
 pytest
 ```
 
